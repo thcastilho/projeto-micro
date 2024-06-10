@@ -4,6 +4,7 @@
 .equ MAX_CHAR, 24
 .equ ASCII_ENTER, 10
 .equ TIMER, 0x10002000 /* Status Register */
+.equ PB, 0x10000050
 
 .org 0x20
 RTI:
@@ -27,9 +28,13 @@ RTI:
     /* instruction upon return to main program */
 
     andi r13, et, 1 /* Check if irq0 asserted */
+    beq r13, r0, CHECK_PUSH_BUTTON /* If not, check other external interrupts */
+    call TRATA_ANIMACAO /* If yes, go to TRATA_ANIMACAO service routine */
+    call TRATA_CRONOMETRO /* If yes, go to TRATA_CRONOMETRO service routine */
+CHECK_PUSH_BUTTON:
+    andi r13, et, 2 /* Check if irq1 asserted */
     beq r13, r0, GO_BACK /* If not, check other external interrupts */
-    call TRATA_ANIMACAO /* If yes, go to IRQ1 service routine */
-    call TRATA_CRONOMETRO /* If yes, go to IRQ1 service routine */
+    call TRATA_BOTAO /* If yes, go to IRQ1 service routine */
 
 GO_BACK:
     /* saving on stack frame */
@@ -61,20 +66,22 @@ _start:
     stwio r10, 12(r8) # parte alta
     /* ********************************************** */
 
-    /* ******* ativa a interrupção com PIE e ienable ******* */
+    /* ******* ativa a interrupção do timer com PIE e ienable ******* */
     movi r11, 7 /* valor do bit de controle ITO do Control Register */
-
-    # configura botao da interrupção (PB1)
     stwio r11, 4(r8) /* escreve o bit de controle no Control Register */
 
-    # seta a interrupção do TIMER no sistema - IRQ0
-    movi r11, 1
+    /* ******* ativa a interrupção do PB com PIE e ienable ******* */
+    movia r8, PB
+    movi r11, 6 /* valor do bit de controle ITO do PB */
+    stwio r11, 8(r8) /* escreve o bit de controle no KEY1 */
+
+    # seta a interrupção do TIMER e pushbutton no sistema - IRQ0 e IRQ1
+    movi r11, 3
     wrctl ienable, r11
 
     # configura bit PIE do processador
     wrctl status, r11   
     /* *************************************************** */
-
 
     movia r9, DATA_REGISTER
     movia r10, RVALID_MASK
@@ -167,6 +174,23 @@ CONTA_CICLO:
 .global STATUS_CRONOMETRO 
 STATUS_CRONOMETRO:
     .word 0 # animacao inicialmente desabilitada
+
+.global PAUSE_CRONOMETRO
+PAUSE_CRONOMETRO:
+    .word 0 # começa inicialmente pausada
+
+.global UNIDADE_CRONOMETRO
+UNIDADE_CRONOMETRO:
+    .word 0 # UNIDADE atual do cronômetro
+.global DEZENA_CRONOMETRO
+DEZENA_CRONOMETRO:
+    .word 0 # DEZENA atual do cronômetro
+.global CENTENA_CRONOMETRO
+CENTENA_CRONOMETRO:
+    .word 0 # CENTENA atual do cronômetro
+.global MILHAR_CRONOMETRO
+MILHAR_CRONOMETRO:
+    .word 0 # MILHAR atual do cronômetro
 
 .align 4
 MESSAGE:
